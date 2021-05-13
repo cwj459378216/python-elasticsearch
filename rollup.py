@@ -12,15 +12,18 @@ import datetime
 
 def parse_args():
     parser = ArgumentParser()
-    parser.add_argument("index")
-    parser.add_argument('aggField')
+    parser.add_argument("--index", dest="index", help="set index", default="omni-bro-conn")
     parser.add_argument("--m", dest="minutes", help="set minutes", default="1")
     parser.add_argument("--h", dest="hours", help="set hours")
     parser.add_argument("--d", dest="days", help="set days")
-    parser.add_argument("--field", dest="field",
+    parser.add_argument("--field", dest="field", default="protocol.keyword",
                         help="set field")
+    parser.add_argument("--showField", dest="showField", default="protocol",
+                        help="set showField")
     parser.add_argument("--filter", dest="filter",
                         help="set filter")
+    parser.add_argument("--aggField", dest="aggField",
+                        help="set aggField")                    
     return parser.parse_args()
 
 
@@ -40,22 +43,26 @@ def printjson(func):
 
 
 def timeRange():
-    time_now = int(time.time())
+    # "%Y-%m-%dT%H:%M:%SZ"
+    formatTime = "%Y-%m-%dT"
     if not (ret.hours is None):
         timeAgo = (datetime.datetime.now() -
                    datetime.timedelta(hours=float(ret.hours)))
+        formatTime = formatTime + "%H:00:00Z"     
     elif not (ret.days is None):
         timeAgo = (datetime.datetime.now() -
                    datetime.timedelta(days=float(ret.days)))
+        formatTime = formatTime + "00:00:00Z"           
     else:
         timeAgo = (datetime.datetime.now() -
                    datetime.timedelta(minutes=float(ret.minutes)))
+        formatTime = formatTime + "%H:%M:00Z"           
     timeStampOld = int(time.mktime(timeAgo.timetuple()))
     timeStampNew = int(time.mktime(datetime.datetime.now().timetuple()))
     startTime = datetime.datetime.utcfromtimestamp(
-        timeStampOld).strftime("%Y-%m-%dT%H:%M:%SZ")
+        timeStampOld).strftime(formatTime)
     endTime = datetime.datetime.utcfromtimestamp(
-        timeStampNew).strftime("%Y-%m-%dT%H:%M:%SZ")
+        timeStampNew).strftime(formatTime)
     query(startTime, endTime)
 
 
@@ -80,7 +87,7 @@ def created():
                 body.get("mappings").get("properties")[f] = {"type": v}
         result = es.indices.create(index=newIndex, body=body, ignore=[
                                    400, 401, 404])
-
+        print(result)
 
 def timer(func):
     def wrapper(*args, **kwargs):
@@ -103,15 +110,16 @@ def createAction(bucket, nowDate):
     }
 
     if not (ret.field is None):
-        action.get('_source')[ret.field] = bucket.get('key')
+        action.get('_source')[ret.showField] = bucket.get('key')
         action.get('_source')['docCount'] = bucket.get('doc_count')
 
-    for k, v in aggFieldObj.items():
-        kArr = k.split('_')
-        way = kArr[0]
-        kArr.remove(way)
-        f = "".join(kArr)
-        action.get('_source')[f] = bucket.get(k).get('value')
+    if not (ret.aggField is None):
+        for k, v in aggFieldObj.items():
+            kArr = k.split('_')
+            way = kArr[0]
+            kArr.remove(way)
+            f = "".join(kArr)
+            action.get('_source')[f] = bucket.get(k).get('value')
     return action
 
 
@@ -176,7 +184,7 @@ def query(startTime, endTime):
 
     if not (ret.field is None):
         body.get('aggregations').get('distribute_by_key')[
-            'terms'] = {"field": aggField, "size": aggSize}
+            'terms'] = {"field": field, "size": aggSize}
         if not (ret.aggField is None):
             body.get('aggregations').get(
                 'distribute_by_key')['aggregations'] = {}
@@ -207,7 +215,7 @@ def query(startTime, endTime):
 
 
 def xstr(s):
-    return '' if s is None else str(s)
+    return '' if s is None else str(s).lower()
 
 
 if __name__ == '__main__':
@@ -215,15 +223,23 @@ if __name__ == '__main__':
     host = '192.168.1.75'
     index = ret.index
     aggSize = 10000
-    aggField = xstr(ret.field) + '.keyword'
     es = Elasticsearch(hosts=[{'host': host, 'port': 9200}])
-    aggFieldObj = json.loads(ret.aggField.replace("'", "\""))
-    if not (ret.hours is None):
-        newIndex = index + '-' + xstr(ret.field) + xstr(ret.hours) + 'h'
-    elif not (ret.days is None):
-        newIndex = index + '-' + xstr(ret.field) + xstr(ret.days) + 'd'
+    if not (ret.field is None):
+        field = ret.field
+        if not (ret.showField is None):
+            showField = ret.showField
+        else:
+            showField = field
     else:
-        newIndex = index + '-' + xstr(ret.field) + xstr(ret.minutes) + 'm'
+        showField = ''        
+    if not (ret.aggField is None):
+        aggFieldObj = json.loads(ret.aggField.replace("'", "\""))
+    if not (ret.hours is None):
+        newIndex = index + '-' + xstr(showField) + xstr(ret.hours) + 'h'
+    elif not (ret.days is None):
+        newIndex = index + '-' + xstr(showField) + xstr(ret.days) + 'd'
+    else:
+        newIndex = index + '-' + xstr(showField) + xstr(ret.minutes) + 'm'
     created()
     timeRange()
     print("index:" + newIndex)
