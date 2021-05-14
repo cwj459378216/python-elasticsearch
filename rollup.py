@@ -12,18 +12,27 @@ import datetime
 
 def parse_args():
     parser = ArgumentParser()
-    parser.add_argument("--index", dest="index", help="set index", default="omni-bro-conn")
-    parser.add_argument("--m", dest="minutes", help="set minutes", default="1")
-    parser.add_argument("--h", dest="hours", help="set hours")
-    parser.add_argument("--d", dest="days", help="set days")
-    parser.add_argument("--field", dest="field", default="protocol.keyword",
-                        help="set field")
-    parser.add_argument("--showField", dest="showField", default="protocol",
-                        help="set showField")
+    parser.add_argument("--index", dest="index",
+                        help="Select Index that needs to be aggregated, required", default="omni-bro-conn")
+    parser.add_argument("--m", dest="minutes",
+                        help="Aggregate per minute", default="1")
+    parser.add_argument("--h", dest="hours", help="Aggregate per hour")
+    parser.add_argument("--d", dest="days", help="Aggregate per day")
+
+    parser.add_argument("--field", dest="field",
+                        help="Select to aggregate a field")
+    parser.add_argument("--showField", dest="showField",
+                        help="Set the output field")
+                        
     parser.add_argument("--filter", dest="filter",
                         help="set filter")
     parser.add_argument("--aggField", dest="aggField",
-                        help="set aggField")                    
+                        help="set aggField")
+
+    parser.add_argument("--topNSize", dest="topNSize",
+                        help="set topNSize")
+    parser.add_argument("--topNField", dest="topNField",
+                        help="set topNField")
     return parser.parse_args()
 
 
@@ -48,15 +57,15 @@ def timeRange():
     if not (ret.hours is None):
         timeAgo = (datetime.datetime.now() -
                    datetime.timedelta(hours=float(ret.hours)))
-        formatTime = formatTime + "%H:00:00Z"     
+        formatTime = formatTime + "%H:00:00Z"
     elif not (ret.days is None):
         timeAgo = (datetime.datetime.now() -
                    datetime.timedelta(days=float(ret.days)))
-        formatTime = formatTime + "00:00:00Z"           
+        formatTime = formatTime + "00:00:00Z"
     else:
         timeAgo = (datetime.datetime.now() -
                    datetime.timedelta(minutes=float(ret.minutes)))
-        formatTime = formatTime + "%H:%M:00Z"           
+        formatTime = formatTime + "%H:%M:00Z"
     timeStampOld = int(time.mktime(timeAgo.timetuple()))
     timeStampNew = int(time.mktime(datetime.datetime.now().timetuple()))
     startTime = datetime.datetime.utcfromtimestamp(
@@ -89,6 +98,7 @@ def created():
                                    400, 401, 404])
         print(result)
 
+
 def timer(func):
     def wrapper(*args, **kwargs):
         res = func(*args, **kwargs)
@@ -120,12 +130,16 @@ def createAction(bucket, nowDate):
             kArr.remove(way)
             f = "".join(kArr)
             action.get('_source')[f] = bucket.get(k).get('value')
+
+    if not (ret.topNField is None):
+        for k, v in bucket.items():
+            action.get('_source')[k] = v
+
     return action
 
 
 def query(startTime, endTime):
     body = {
-        "size": 0,
         "aggregations": {
             "distribute_by_key": {
                 # "terms": {
@@ -211,7 +225,26 @@ def query(startTime, endTime):
             body['aggregations'][k] = {way: {"field": f}}
         buckets = es.search(index=index, body=body).get('aggregations')
         batch_data([createAction(buckets, endTime)])
-    print("query:" + json.dumps(body))    
+
+    if not (ret.topNField is None):
+        queryBody = {}
+        queryBody["size"] = ret.topNSize
+        queryBody["sort"] = [
+            {
+                ret.topNField: {
+                    "order": "desc"
+                }
+            }
+        ]
+        buckets = es.search(index=index, body=queryBody)
+        print(json.dumps(buckets))
+        # createAction(buckets.get('hits').get('hits'), endTime)
+        if not (ret.topNField is None):
+            arr = []
+            for bucket in buckets.get('hits').get('hits'):
+                arr.append(createAction(bucket.get('_source'), endTime)) 
+        batch_data(arr)
+    print("query:" + json.dumps(body))
 
 
 def xstr(s):
@@ -231,7 +264,7 @@ if __name__ == '__main__':
         else:
             showField = field
     else:
-        showField = ''        
+        showField = ''
     if not (ret.aggField is None):
         aggFieldObj = json.loads(ret.aggField.replace("'", "\""))
     if not (ret.hours is None):
