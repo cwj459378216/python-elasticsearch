@@ -23,7 +23,7 @@ def parse_args():
                         help="Select to aggregate a field")
     parser.add_argument("--showField", dest="showField",
                         help="Set the output field")
-                        
+
     parser.add_argument("--filter", dest="filter",
                         help="set filter")
     parser.add_argument("--aggField", dest="aggField",
@@ -111,11 +111,12 @@ def batch_data(action):
     helpers.bulk(es, action)
 
 
-def createAction(bucket, nowDate):
+def createAction(bucket, startTime):
     action = {
         "_index": newIndex,
+        # '_type': "doc",
         "_source": {
-            "timestamp": nowDate
+            "timestamp": startTime
         }
     }
 
@@ -133,7 +134,8 @@ def createAction(bucket, nowDate):
 
     if not (ret.topNField is None):
         for k, v in bucket.items():
-            action.get('_source')[k] = v
+            if not (k == "timestamp"):
+                action.get('_source')[k] = v
 
     return action
 
@@ -176,8 +178,8 @@ def query(startTime, endTime):
         queryFilter.get("bool").get("filter").append({
             "range": {
                 "timestamp": {
-                    "from": startTime,
-                    "to": endTime,
+                    "gte": startTime,
+                    "lt": endTime,
                 }
             }
         })
@@ -188,8 +190,8 @@ def query(startTime, endTime):
                 {
                     "range": {
                         "timestamp": {
-                            "from": startTime,
-                            "to": endTime,
+                            "gte": startTime,
+                            "lt": endTime,
                         }
                     }
                 }
@@ -213,7 +215,7 @@ def query(startTime, endTime):
             'aggregations').get('distribute_by_key').get('buckets')
         arr = []
         for bucket in buckets:
-            arr.append(createAction(bucket, endTime))
+            arr.append(createAction(bucket, startTime))
         batch_data(arr)
     elif not (ret.aggField is None):
         body['aggregations'] = {}
@@ -224,27 +226,54 @@ def query(startTime, endTime):
             f = "".join(kArr)
             body['aggregations'][k] = {way: {"field": f}}
         buckets = es.search(index=index, body=body).get('aggregations')
-        batch_data([createAction(buckets, endTime)])
-
+        batch_data([createAction(buckets, startTime)])
+    print("query:" + json.dumps(body))
     if not (ret.topNField is None):
         queryBody = {}
-        queryBody["size"] = ret.topNSize
-        queryBody["sort"] = [
-            {
-                ret.topNField: {
-                    "order": "desc"
+        queryBody["query"] = {"bool": {
+            "filter": [
+                {
+                    "range": {
+                        "timestamp": {
+                            "gte": startTime,
+                            "lt": endTime,
+                        }
+                    }
                 }
+            ]
+        }}
+        queryBody["size"] = ret.topNSize
+        topFields = ret.topNField.split(',')
+        sourceStr = ''
+        for topField in topFields:
+            print(topField)
+            sourceStr += "doc['" + topField + "'].value" + " + "
+        sourceArr = sourceStr.split(' + ')
+        sourceArr.pop()
+        source = '+'.join(sourceArr)
+        queryBody["sort"] = {
+            "_script": {
+                "type": "number",
+                "script": {
+                    "lang": "painless",
+                    "source": source,
+                    "params": {
+                        "factor": 1.1
+                    }
+                },
+                "order": "desc"
             }
-        ]
+        }
+        print(json.dumps(queryBody))
         buckets = es.search(index=index, body=queryBody)
         print(json.dumps(buckets))
         # createAction(buckets.get('hits').get('hits'), endTime)
         if not (ret.topNField is None):
             arr = []
             for bucket in buckets.get('hits').get('hits'):
-                arr.append(createAction(bucket.get('_source'), endTime)) 
+                arr.append(createAction(bucket.get('_source'), startTime))
         batch_data(arr)
-    print("query:" + json.dumps(body))
+        print("queryBody:" + json.dumps(queryBody))
 
 
 def xstr(s):
