@@ -53,6 +53,7 @@ def printjson(func):
 
 def timeRange():
     # "%Y-%m-%dT%H:%M:%SZ"
+    delaytime = 30
     formatTime = "%Y-%m-%dT"
     if not (ret.hours is None):
         timeAgo = (datetime.datetime.now() -
@@ -64,7 +65,7 @@ def timeRange():
         formatTime = formatTime + "00:00:00Z"
     else:
         timeAgo = (datetime.datetime.now() -
-                   datetime.timedelta(minutes=float(ret.minutes)))
+                   datetime.timedelta(minutes=float(ret.minutes)))       
         formatTime = formatTime + "%H:%M:00Z"
     timeStampOld = int(time.mktime(timeAgo.timetuple()))
     timeStampNew = int(time.mktime(datetime.datetime.now().timetuple()))
@@ -72,11 +73,24 @@ def timeRange():
         timeStampOld).strftime(formatTime)
     endTime = datetime.datetime.utcfromtimestamp(
         timeStampNew).strftime(formatTime)
+    time.sleep(delaytime)    
     query(startTime, endTime)
 
 
 def created():
     if not es.indices.exists(index=newIndex):
+        # body = {
+        #     "mappings": {
+        #         "doc": {
+        #             'properties': {
+        #                 "timestamp": {
+        #                     "type": "date",
+        #                     "format": "strict_date_optional_time||epoch_millis||yy/mm/dd-HH:mm:ss"
+        #                 }
+        #             }
+        #         }
+        #     }
+        # }
         body = {
             "mappings": {
                 'properties': {
@@ -93,6 +107,7 @@ def created():
                 way = kArr[0]
                 kArr.remove(way)
                 f = "".join(kArr)
+                # body.get("mappings").get('doc').get("properties")[f] = {"type": v}
                 body.get("mappings").get("properties")[f] = {"type": v}
         result = es.indices.create(index=newIndex, body=body, ignore=[
                                    400, 401, 404])
@@ -129,8 +144,9 @@ def createAction(bucket, startTime):
             kArr = k.split('_')
             way = kArr[0]
             kArr.remove(way)
-            f = "".join(kArr)
-            action.get('_source')[f] = bucket.get(k).get('value')
+            if (way != '#'):
+                f = "".join(kArr)
+                action.get('_source')[f] = bucket.get(k).get('value')
 
     if not (ret.topNField is None):
         for k, v in bucket.items():
@@ -207,10 +223,11 @@ def query(startTime, endTime):
             for k, v in aggFieldObj.items():
                 kArr = k.split('_')
                 way = kArr[0]
-                kArr.remove(way)
-                f = "".join(kArr)
-                body.get('aggregations').get('distribute_by_key')[
-                    'aggregations'][k] = {way: {"field": f}}
+                if (way != '#'):
+                    kArr.remove(way)
+                    f = "".join(kArr)
+                    body.get('aggregations').get('distribute_by_key')[
+                        'aggregations'][k] = {way: {"field": f}}
         buckets = es.search(index=index, body=body).get(
             'aggregations').get('distribute_by_key').get('buckets')
         arr = []
@@ -222,9 +239,11 @@ def query(startTime, endTime):
         for k, v in aggFieldObj.items():
             kArr = k.split('_')
             way = kArr[0]
-            kArr.remove(way)
-            f = "".join(kArr)
-            body['aggregations'][k] = {way: {"field": f}}
+            if (way != '#'):
+                kArr.remove(way)
+                f = "".join(kArr)
+                body.get('aggregations').get('distribute_by_key')[
+                    'aggregations'][k] = {way: {"field": f}}
         buckets = es.search(index=index, body=body).get('aggregations')
         batch_data([createAction(buckets, startTime)])
     print("query:" + json.dumps(body))
