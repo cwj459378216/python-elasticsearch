@@ -1,0 +1,1 @@
+{"properties":{"timestamp":{"type":"date","format":"strict_date_optional_time||epoch_millis||yy/mm/dd-HH:mm:ss.SSSSSS"},"srcIP":{"type":"ip"},"dstIP":{"type":"ip"},"srcPort":{"type":"integer"},"dstPort":{"type":"integer"},"srcIPGeo":{"properties":{"location":{"type":"geo_point"}}},"dstIPGeo":{"properties":{"location":{"type":"geo_point"}}}}}

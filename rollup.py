@@ -301,7 +301,7 @@ def xstr(s):
 
 if __name__ == '__main__':
     ret = parse_args()
-    host = '192.168.1.75'
+    host = 'localhost'
     index = ret.index
     aggSize = 10000
     es = Elasticsearch(hosts=[{'host': host, 'port': 9200}])

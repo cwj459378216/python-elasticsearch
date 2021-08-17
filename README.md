@@ -33,3 +33,6 @@ python .\rollup.py --d=1 --index="omni-bro-conn" --field="dstIP" --showField="ho
 
 ## protocol 聚合
 python .\rollup.py --d=10000 --index="omni-bro-conn" --field="protocol.keyword" --showField="protocol"   --aggField="{'sum_origBytes':'integer','sum_respBytes':'long','sum_origPkts':'integer','sum_respPkts':'integer'}"
+
+## 创建kibana index
+mapping.py --lua=beat_config.lua
