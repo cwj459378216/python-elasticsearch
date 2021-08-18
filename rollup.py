@@ -79,36 +79,36 @@ def timeRange():
 
 def created():
     if not es.indices.exists(index=newIndex):
-        # body = {
-        #     "mappings": {
-        #         "doc": {
-        #             'properties': {
-        #                 "timestamp": {
-        #                     "type": "date",
-        #                     "format": "strict_date_optional_time||epoch_millis||yy/mm/dd-HH:mm:ss"
-        #                 }
-        #             }
-        #         }
-        #     }
-        # }
         body = {
             "mappings": {
-                'properties': {
-                    "timestamp": {
-                        "type": "date",
-                        "format": "strict_date_optional_time||epoch_millis||yy/mm/dd-HH:mm:ss"
+                "doc": {
+                    'properties': {
+                        "timestamp": {
+                            "type": "date",
+                            "format": "strict_date_optional_time||epoch_millis||yy/mm/dd-HH:mm:ss"
+                        }
                     }
                 }
             }
         }
+        # body = {
+        #     "mappings": {
+        #         'properties': {
+        #             "timestamp": {
+        #                 "type": "date",
+        #                 "format": "strict_date_optional_time||epoch_millis||yy/mm/dd-HH:mm:ss"
+        #             }
+        #         }
+        #     }
+        # }
         if not (ret.aggField is None):
             for k, v in aggFieldObj.items():
                 kArr = k.split('_')
                 way = kArr[0]
                 kArr.remove(way)
                 f = "".join(kArr)
-                # body.get("mappings").get('doc').get("properties")[f] = {"type": v}
-                body.get("mappings").get("properties")[f] = {"type": v}
+                body.get("mappings").get('doc').get("properties")[f] = {"type": v}
+                # body.get("mappings").get("properties")[f] = {"type": v}
         result = es.indices.create(index=newIndex, body=body, ignore=[
                                    400, 401, 404])
         print(result)
@@ -130,6 +130,7 @@ def createAction(bucket, startTime):
     action = {
         "_index": newIndex,
         # '_type': "doc",
+        '_type': "doc",
         "_source": {
             "timestamp": startTime
         }
@@ -246,7 +247,7 @@ def query(startTime, endTime):
                     'aggregations'][k] = {way: {"field": f}}
         buckets = es.search(index=index, body=body).get('aggregations')
         batch_data([createAction(buckets, startTime)])
-    print("query:" + json.dumps(body))
+    # print("query:" + json.dumps(body))
     if not (ret.topNField is None):
         queryBody = {}
         queryBody["query"] = {"bool": {
@@ -259,13 +260,14 @@ def query(startTime, endTime):
                         }
                     }
                 }
-            ]
+            ],
+            "must_not": [{"prefix": {"filePath.keyword": {"value": "/datastore"}}}]
         }}
         queryBody["size"] = ret.topNSize
         topFields = ret.topNField.split(',')
         sourceStr = ''
         for topField in topFields:
-            print(topField)
+            # print(topField)
             sourceStr += "doc['" + topField + "'].value" + " + "
         sourceArr = sourceStr.split(' + ')
         sourceArr.pop()
@@ -285,14 +287,15 @@ def query(startTime, endTime):
         }
         print(json.dumps(queryBody))
         buckets = es.search(index=index, body=queryBody)
-        print(json.dumps(buckets))
+        # print(json.dumps(buckets))
         # createAction(buckets.get('hits').get('hits'), endTime)
+        print(len(buckets.get('hits').get('hits')))
         if not (ret.topNField is None):
             arr = []
             for bucket in buckets.get('hits').get('hits'):
                 arr.append(createAction(bucket.get('_source'), startTime))
         batch_data(arr)
-        print("queryBody:" + json.dumps(queryBody))
+        # print("queryBody:" + json.dumps(queryBody))
 
 
 def xstr(s):
