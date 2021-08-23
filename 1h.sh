@@ -11,4 +11,4 @@ python /datastore/user/admin/script/rollup.py --h=1 --topNSize=500 --topNField="
 # python /datastore/user/admin/script/rollup.py --index="omni-bro-conn-appname1m-appname5m-appname10m-appname15m-appname30m" --h=1 --field="appName.keyword" --showField="appName"   --aggField="{'sum_origIpBytes':'integer','sum_respIpBytes':'integer','sum_origPkts':'long','sum_respPkts':'integer'}"
 
 # host
-# python /datastore/user/admin/script/rollup.py --index="omni-bro-conn-host1m-host5m-host10m-host15m-host30m" --h=1 --field="host" --showField="host" --aggField="{'#_host':'ip'}"
+#python /datastore/user/admin/script/rollup.py --index="omni-bro-conn-host1m-host5m-host10m-host15m-host30m" --h=1 --field="host" --showField="host" --aggField="{'#_host':'ip'}"

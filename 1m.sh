@@ -2,7 +2,7 @@
 #set -x
 
 # topN 500
-python /datastore/user/admin/script/rollup.py --topNSize=500 --topNField="origIpBytes,respIpBytes"
+python /datastore/user/admin/script/rollup.py --topNSize=500 --topNField="origIpBytes,respIpBytes" --aggField="{'srcIP':'ip','dstIP':'ip'}"
 
 # topN ip protocol
 # python /datastore/user/admin/script/rollup.py --index="omni-bro-conn" --field="protocol.keyword" --showField="protocol"   --aggField="{'sum_origIpBytes':'integer','sum_respIpBytes':'integer','sum_origPkts':'long','sum_respPkts':'integer'}"
