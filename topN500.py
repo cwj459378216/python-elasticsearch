@@ -33,6 +33,8 @@ def parse_args():
                         help="set topNSize")
     parser.add_argument("--topNField", dest="topNField",
                         help="set topNField")
+    parser.add_argument("--createdIndex", dest="createdIndex",
+                        help="set createdIndex")
     return parser.parse_args()
 
 
@@ -331,6 +333,8 @@ if __name__ == '__main__':
         newIndex = index + '-' + xstr(showField) + xstr(ret.days) + 'd'
     else:
         newIndex = index + '-' + xstr(showField) + xstr(ret.minutes) + 'm'
+    if not (ret.createdIndex is None):
+        newIndex = ret.createdIndex
     created()
     timeRange()
     print("index:" + newIndex)
